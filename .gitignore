@@ -1,0 +1,13 @@
+# Log files
+*.log
+nfs-toolkit.log
+
+# Temporary and backup files
+*.bak
+*.bak.*
+*.candidate
+*.tmp
+
+# OS metadata
+.DS_Store
+Thumbs.db
