@@ -11,12 +11,13 @@ Developed as an **Operating Systems Course Project**, this toolkit emphasizes de
 2. [Ubuntu Requirements & Prerequisites](#ubuntu-requirements--prerequisites)
 3. [Architecture & Safety Design](#architecture--safety-design)
 4. [Installation & Setup](#installation--setup)
-5. [Usage & Menu Walkthrough](#usage--menu-walkthrough)
-6. [CLI Flags & Dry-Run Mode](#cli-flags--dry-run-mode)
-7. [NFS Export Options Explained](#nfs-export-options-explained)
-8. [Client-Side Instructions](#client-side-instructions)
-9. [Security Notes & Best Practices](#security-notes--best-practices)
-10. [Troubleshooting](#troubleshooting)
+5. [Complete Step-by-Step Procedure: Setup, Connect & Teardown](#complete-step-by-step-procedure-setup-connect--teardown)
+6. [Usage & Menu Walkthrough](#usage--menu-walkthrough)
+7. [CLI Flags & Dry-Run Mode](#cli-flags--dry-run-mode)
+8. [NFS Export Options Explained](#nfs-export-options-explained)
+9. [Client-Side Instructions](#client-side-instructions)
+10. [Security Notes & Best Practices](#security-notes--best-practices)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -104,7 +105,101 @@ The toolkit detects these packages and utilities:
 
 ---
 
-## Usage & Menu Walkthrough
+## Complete Step-by-Step Procedure: Setup, Connect & Teardown
+
+Follow this end-to-end procedure on an authorized Ubuntu server and client machine.
+
+### Phase 1: Pre-Flight Check & Package Installation
+1. **Launch the Toolkit**:
+   ```bash
+   ./nfs-toolkit.sh
+   ```
+2. **Install NFS Server Package**:
+   - In the menu, select **`2`** (*Install NFS Kernel Server Package*).
+   - Review the planned changes (`nfs-kernel-server`, `rpcbind`).
+   - At the prompt: `Do you authorize updating apt caches and installing 'nfs-kernel-server'? [y/N]:` $\rightarrow$ Type **`y`** and press Enter.
+
+### Phase 2: Configure & Publish the NFS Export
+1. In the menu, select **`3`** (*Configure & Apply Managed Export Entry*).
+2. **Step 1 - Directory to Share**:
+   - Press **`Enter`** to accept the standard default `/srv/nfs/labshare`, **OR** type any custom directory path (e.g. `/home/munsi/Documents` or `~/my_share`).
+   - If the directory does not exist, type **`y`** to let the toolkit create it.
+   - If asked to configure permissions (`nobody:nogroup`, `chmod 775`), type **`y`**.
+3. **Step 2 - Target Subnet**:
+   - Press **`Enter`** to accept your auto-detected device subnet (e.g., `192.168.0.0/24` or `192.168.1.0/24`).
+4. **Step 3 - Access Permissions**:
+   - Press **`1`** for Read-Only (`ro`), or **`2`** for Read-Write (`rw`). If `2` is selected, acknowledge the security warning with **`y`**.
+5. **Step 4 - Write Synchronization**:
+   - Press **`1`** for Synchronous (`sync`, recommended for data integrity).
+6. **Step 5 - Root Squash**:
+   - Press **`1`** for `root_squash` (secure default: maps remote UID 0 to `nobody`).
+7. **Step 6 - macOS & Windows Compatibility**:
+   - Press **`y`** to enable `insecure` (allows client RPC connections from unprivileged high ports > 1024).
+8. **Validation & Apply**:
+   - Type **`y`** to validate and apply the export entry.
+   - The toolkit validates syntax, applies the configuration, reloads active exports via `sudo exportfs -ra`, and immediately displays your **Quick Connect Links**.
+
+### Phase 3: Connect from Client Devices
+
+Copy and paste the appropriate link or command from the generated Quick Connect banner:
+
+#### A. From macOS:
+- **GUI (Finder)**:
+  1. Click desktop $\rightarrow$ Press **`Cmd + K`** (*Connect to Server*).
+  2. Paste URI: `nfs://<SERVER_IP>/<SHARE_PATH>` (e.g., `nfs://192.168.0.10/home/munsi/Documents`).
+  3. Click **Connect**.
+- **CLI (Terminal)**:
+  ```bash
+  sudo mkdir -p /Volumes/labshare
+  sudo mount -t nfs -o resvport 192.168.0.10:/home/munsi/Documents /Volumes/labshare
+  ```
+
+#### B. From Windows (Pro, Enterprise, Education):
+1. Enable NFS client in Administrator PowerShell (one-time):
+   ```powershell
+   Enable-WindowsOptionalFeature -Online -FeatureName ServicesForNFS-ClientOnly, ClientForNFS-Infrastructure -NoRestart
+   ```
+2. Mount as a network drive in Command Prompt or PowerShell:
+   ```cmd
+   mount -o anon \\192.168.0.10\home\munsi\Documents Z:
+   ```
+3. Open File Explorer to access drive `Z:`.
+
+#### C. From Another Linux Machine:
+1. Install client package:
+   ```bash
+   sudo apt update && sudo apt install -y nfs-common
+   ```
+2. Mount the share:
+   ```bash
+   sudo mkdir -p /mnt/labshare
+   sudo mount -t nfs -o sync,hard,intr 192.168.0.10:/home/munsi/Documents /mnt/labshare
+   ```
+
+### Phase 4: Verify Permissions & Root Squash
+On your client machine:
+1. **Read Verification**: List and view files inside the mounted directory.
+2. **Write Verification (If `rw`)**:
+   ```bash
+   touch /mnt/labshare/test_file.txt
+   echo "NFS Lab Verification" > /mnt/labshare/test_file.txt
+   ```
+3. **Root Squash Verification**:
+   ```bash
+   sudo touch /mnt/labshare/root_test.txt
+   ls -la /mnt/labshare/root_test.txt
+   ```
+   *(Notice that the file is owned by `nobody:nogroup`, proving `root_squash` successfully blocked remote root privileges).*
+
+### Phase 5: Unmount & Full Server Teardown
+1. **Unmount on Client First**:
+   - Linux: `sudo umount /mnt/labshare`
+   - macOS: `sudo umount /Volumes/labshare` (or click Eject in Finder sidebar)
+   - Windows: `umount Z:`
+2. **Stop NFS Service Completely on Server**:
+   - In `./nfs-toolkit.sh`, select **`8`** (*Remove Managed Export & Stop NFS Services Completely*).
+   - Confirm with **`y`**.
+   - The toolkit cleanly deletes the managed block from `/etc/exports`, flushes the kernel table (`exportfs -au`), stops and disables `nfs-kernel-server` systemd services, and verifies that ports 2049 and 111 are closed.
 
 Launch the interactive interface:
 ```bash
